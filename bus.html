@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>🏠 6s Plus 橫向巴士看板</title>
+    <title>🏠 6s Plus 橫向巴士看板 (九巴API穩定版)</title>
     <style>
         :root {
             --bg-color: #0c0c0c;
@@ -16,9 +16,7 @@
             --accent-green: #2ecc71;
         }
 
-        * {
-            box-sizing: border-box;
-        }
+        * { box-sizing: border-box; }
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
@@ -40,17 +38,8 @@
             border-bottom: 1px solid #222;
         }
 
-        h1 {
-            font-size: 1.1rem;
-            margin: 0;
-            color: var(--text-sub);
-        }
-
-        .update-time {
-            font-size: 0.8rem;
-            color: var(--accent-green);
-            font-weight: bold;
-        }
+        h1 { font-size: 1.1rem; margin: 0; color: var(--text-sub); }
+        .update-time { font-size: 0.8rem; color: var(--accent-green); font-weight: bold; }
 
         .main-layout {
             display: flex;
@@ -60,18 +49,8 @@
             height: calc(100vh - 45px);
         }
 
-        .column-left {
-            flex: 1.2;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .column-right {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
+        .column-left { flex: 1.2; display: flex; flex-direction: column; }
+        .column-right { flex: 1; display: flex; flex-direction: column; gap: 10px; }
 
         .station-section {
             background-color: var(--card-bg);
@@ -83,10 +62,7 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.5);
         }
 
-        .column-right .station-section {
-            height: calc(50% - 5px); 
-        }
-
+        .column-right .station-section { height: calc(50% - 5px); }
         .station-title {
             font-size: 0.9rem;
             font-weight: bold;
@@ -97,59 +73,15 @@
             white-space: nowrap;
         }
 
-        .route-list {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-around;
-        }
-
-        .route-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 2px 0;
-        }
-
-        .route-info {
-            display: flex;
-            align-items: baseline;
-            gap: 8px;
-        }
-
-        .route-name {
-            font-size: 1.3rem;
-            font-weight: 900;
-            color: var(--accent-orange);
-            width: 45px;
-        }
-
-        .route-dest {
-            font-size: 0.75rem;
-            color: var(--text-sub);
-        }
-
-        .eta-info {
-            text-align: right;
-        }
-
-        .eta-main {
-            font-size: 1.15rem;
-            font-weight: bold;
-        }
-
-        .eta-sub {
-            font-size: 0.7rem;
-            color: var(--text-sub);
-        }
-
-        .loading {
-            color: var(--text-sub);
-            font-style: italic;
-            font-size: 0.85rem;
-            text-align: center;
-            margin-top: 20px;
-        }
+        .route-list { flex: 1; display: flex; flex-direction: column; justify-content: space-around; }
+        .route-row { display: flex; justify-content: space-between; align-items: center; padding: 2px 0; }
+        .route-info { display: flex; align-items: baseline; gap: 8px; }
+        .route-name { font-size: 1.3rem; font-weight: 900; color: var(--accent-orange); width: 45px; }
+        .route-dest { font-size: 0.75rem; color: var(--text-sub); }
+        .eta-info { text-align: right; }
+        .eta-main { font-size: 1.15rem; font-weight: bold; }
+        .eta-sub { font-size: 0.7rem; color: var(--text-sub); }
+        .loading { color: var(--text-sub); font-style: italic; font-size: 0.85rem; text-align: center; margin-top: 20px; }
     </style>
 </head>
 <body>
@@ -163,53 +95,48 @@
         <div class="column-left">
             <div class="station-section">
                 <div class="station-title">📍 宏德居 ➡️ 往藍灣半島</div>
-                <div id="station-1" class="route-list">
-                    <div class="loading">載入中...</div>
-                </div>
+                <div id="station-1" class="route-list"><div class="loading">載入中...</div></div>
             </div>
         </div>
 
         <div class="column-right">
             <div class="station-section">
                 <div class="station-title">📍 環翠 ➡️ 往跑馬地</div>
-                <div id="station-2" class="route-list">
-                    <div class="loading">載入中...</div>
-                </div>
+                <div id="station-2" class="route-list"><div class="loading">載入中...</div></div>
             </div>
             
             <div class="station-section">
                 <div class="station-title">📍 環翠 ➡️ 往其他 (82X, 8P)</div>
-                <div id="station-3" class="route-list">
-                    <div class="loading">載入中...</div>
-                </div>
+                <div id="station-3" class="route-list"><div class="loading">載入中...</div></div>
             </div>
         </div>
     </div>
 
     <script>
+        // 配置調整：改為九巴對應的 Stop ID 
         const config = {
             station1: {
-                stopId: '001307',
+                stopId: 'CH06-N-1050-0', // 宏德居
                 routes: [
-                    { route: '82', dest: '藍灣半島' },
-                    { route: '82X', dest: '藍灣半島' },
-                    { route: '8X', dest: '藍灣半島' },
-                    { route: '8P', dest: '藍灣半島' }
+                    { route: '82', dest: '藍灣半島', dir: 'O' },
+                    { route: '82X', dest: '藍灣半島', dir: 'O' },
+                    { route: '8X', dest: '藍灣半島', dir: 'O' },
+                    { route: '8P', dest: '藍灣半島', dir: 'O' }
                 ],
                 elementId: 'station-1'
             },
             station2: {
-                stopId: '001314',
+                stopId: 'CH06-S-1200-0', // 環翠商場
                 routes: [
-                    { route: '8X', dest: '跑馬地' }
+                    { route: '8X', dest: '跑馬地', dir: 'I' }
                 ],
                 elementId: 'station-2'
             },
             station3: {
-                stopId: '001314',
+                stopId: 'CH06-S-1200-0', // 環翠商場
                 routes: [
-                    { route: '82X', dest: '鰂魚涌' },
-                    { route: '8P', dest: '灣仔北' }
+                    { route: '82X', dest: '鰂魚涌', dir: 'I' },
+                    { route: '8P', dest: '灣仔北', dir: 'I' }
                 ],
                 elementId: 'station-3'
             }
@@ -217,29 +144,37 @@
 
         async function fetchETA(stopId, targetRoutes) {
             try {
-                // 使用了開源的 CORS Proxy 代理去包裝原本的城巴網址，完美解決安全限制
-                const targetUrl = `https://rt.data.gov.hk/v2/transport/citybus/eta/CTB/${stopId}/1`;
-                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
-                
-                const response = await fetch(proxyUrl);
-                const proxyData = await response.json();
-                
-                // allorigins 會將結果包在 .contents 字串內，我們需要將它轉回 JSON
-                const data = JSON.parse(proxyData.contents);
+                // 直接呼叫九巴 API，無 CORS 阻擋問題，乾淨利落
+                const response = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop-eta/${stopId}`);
+                const data = await response.json();
                 
                 if (!data || !data.data) return [];
                 
                 let result = [];
+                
                 targetRoutes.forEach(target => {
-                    let matchedEtas = data.data.filter(item => item.route === target.route);
-                    let nextBus = matchedEtas.find(item => item.eta_seq === 1);
+                    // 篩選出對應路線以及方向 (九巴API中，城巴港島線多數以 dir: 'O' 或 'I' 區分)
+                    let matchedEtas = data.data.filter(item => 
+                        item.route === target.route && 
+                        (item.dir === target.dir || item.dir === 'B') // 'B'代表循環線/雙向
+                    );
+                    
+                    // 排序並拿第一班車
+                    matchedEtas.sort((a, b) => a.eta_seq - b.eta_seq);
+                    let nextBus = matchedEtas[0];
                     
                     if (nextBus && nextBus.eta) {
+                        // 計算剩餘分鐘
+                        const etaTime = new Date(nextBus.eta);
+                        const now = new Date();
+                        const diffMs = etaTime - now;
+                        const rmin = Math.max(0, Math.floor(diffMs / 1000 / 60));
+                        
                         result.push({
                             route: target.route,
                             dest: target.dest,
-                            etaTime: new Date(nextBus.eta),
-                            rmin: nextBus.rmin
+                            etaTime: etaTime,
+                            rmin: rmin
                         });
                     } else {
                         result.push({ route: target.route, dest: target.dest, etaTime: null, rmin: -1 });
@@ -247,7 +182,7 @@
                 });
                 return result;
             } catch (error) {
-                console.error("Error fetching bus data:", error);
+                console.error("Error fetching KMB/CTB API:", error);
                 return null;
             }
         }
@@ -305,7 +240,7 @@
         }
 
         updateDashboard();
-        setInterval(updateDashboard, 30000); // 每 30 秒自動刷新
+        setInterval(updateDashboard, 30000); // 30秒自動更新
     </script>
 </body>
 </html>
