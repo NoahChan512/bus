@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>🏠 6s Plus 橫向巴士看板 (九巴API穩定版)</title>
+    <title>🏠 6s Plus 橫向巴士看板 (終極穩定版)</title>
     <style>
         :root {
             --bg-color: #0c0c0c;
@@ -82,6 +82,7 @@
         .eta-main { font-size: 1.15rem; font-weight: bold; }
         .eta-sub { font-size: 0.7rem; color: var(--text-sub); }
         .loading { color: var(--text-sub); font-style: italic; font-size: 0.85rem; text-align: center; margin-top: 20px; }
+        .error-msg { color: #e74c3c; font-size: 0.8rem; text-align: center; }
     </style>
 </head>
 <body>
@@ -113,30 +114,30 @@
     </div>
 
     <script>
-        // 配置調整：改為九巴對應的 Stop ID 
+        // 改回城巴官方 Stop ID，並配對正確的目的地
         const config = {
             station1: {
-                stopId: 'CH06-N-1050-0', // 宏德居
+                stopId: '001307', // 宏德居
                 routes: [
-                    { route: '82', dest: '藍灣半島', dir: 'O' },
-                    { route: '82X', dest: '藍灣半島', dir: 'O' },
-                    { route: '8X', dest: '藍灣半島', dir: 'O' },
-                    { route: '8P', dest: '藍灣半島', dir: 'O' }
+                    { route: '82', dest: '藍灣半島' },
+                    { route: '82X', dest: '藍灣半島' },
+                    { route: '8X', dest: '藍灣半島' },
+                    { route: '8P', dest: '藍灣半島' }
                 ],
                 elementId: 'station-1'
             },
             station2: {
-                stopId: 'CH06-S-1200-0', // 環翠商場
+                stopId: '001314', // 環翠商場
                 routes: [
-                    { route: '8X', dest: '跑馬地', dir: 'I' }
+                    { route: '8X', dest: '跑馬地 (下)' }
                 ],
                 elementId: 'station-2'
             },
             station3: {
-                stopId: 'CH06-S-1200-0', // 環翠商場
+                stopId: '001314', // 環翠商場
                 routes: [
-                    { route: '82X', dest: '鰂魚涌', dir: 'I' },
-                    { route: '8P', dest: '灣仔北', dir: 'I' }
+                    { route: '82X', dest: '鰂魚涌' },
+                    { route: '8P', dest: '灣仔 (北)' }
                 ],
                 elementId: 'station-3'
             }
@@ -144,45 +145,36 @@
 
         async function fetchETA(stopId, targetRoutes) {
             try {
-                // 直接呼叫九巴 API，無 CORS 阻擋問題，乾淨利落
-                const response = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop-eta/${stopId}`);
-                const data = await response.json();
+                const targetUrl = `https://rt.data.gov.hk/v2/transport/citybus/eta/CTB/${stopId}/1`;
+                // 使用最穩定、速度極快且專門處理 CORS 的 corsproxy.io
+                const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
                 
+                const response = await fetch(proxyUrl);
+                if (!response.ok) throw new Error('Network response was not ok');
+                
+                const data = await response.json();
                 if (!data || !data.data) return [];
                 
                 let result = [];
-                
                 targetRoutes.forEach(target => {
-                    // 篩選出對應路線以及方向 (九巴API中，城巴港島線多數以 dir: 'O' 或 'I' 區分)
-                    let matchedEtas = data.data.filter(item => 
-                        item.route === target.route && 
-                        (item.dir === target.dir || item.dir === 'B') // 'B'代表循環線/雙向
-                    );
-                    
-                    // 排序並拿第一班車
-                    matchedEtas.sort((a, b) => a.eta_seq - b.eta_seq);
-                    let nextBus = matchedEtas[0];
+                    let matchedEtas = data.data.filter(item => item.route === target.route);
+                    // 篩選第一班最快到的車
+                    let nextBus = matchedEtas.find(item => item.eta_seq === 1);
                     
                     if (nextBus && nextBus.eta) {
-                        // 計算剩餘分鐘
-                        const etaTime = new Date(nextBus.eta);
-                        const now = new Date();
-                        const diffMs = etaTime - now;
-                        const rmin = Math.max(0, Math.floor(diffMs / 1000 / 60));
-                        
                         result.push({
                             route: target.route,
-                            dest: target.dest,
-                            etaTime: etaTime,
-                            rmin: rmin
+                            dest: target.dest.replace(' (藍灣半島)', '').replace(' (下)', '').replace(' (北)', ''),
+                            etaTime: new Date(nextBus.eta),
+                            rmin: nextBus.rmin
                         });
                     } else {
-                        result.push({ route: target.route, dest: target.dest, etaTime: null, rmin: -1 });
+                        result.push({ route: target.route, dest: target.dest.replace(' (藍灣半島)', '').replace(' (下)', '').replace(' (北)', ''), etaTime: null, rmin: -1 });
                     }
                 });
                 return result;
             } catch (error) {
-                console.error("Error fetching KMB/CTB API:", error);
+                console.error("Fetch error:", error);
                 return null;
             }
         }
@@ -201,7 +193,12 @@
                 const etas = await fetchETA(sect.stopId, sect.routes);
                 const container = document.getElementById(sect.elementId);
                 
-                if (!etas || etas.length === 0) {
+                if (etas === null) {
+                    container.innerHTML = `<div class="error-msg">連線失敗，稍後重試</div>`;
+                    continue;
+                }
+                
+                if (etas.length === 0) {
                     container.innerHTML = `<div class="loading">無數據</div>`;
                     continue;
                 }
@@ -240,7 +237,7 @@
         }
 
         updateDashboard();
-        setInterval(updateDashboard, 30000); // 30秒自動更新
+        setInterval(updateDashboard, 30000); // 30秒自動刷新
     </script>
 </body>
 </html>
