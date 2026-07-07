@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>🏠 6s Plus 橫向巴士看板 (終極防錯版)</title>
+    <title>🚍 屋企巴士看板 (6s Plus 橫向專用 · 修復版)</title>
     <style>
         :root {
             --bg-color: #0c0c0c;
@@ -14,9 +14,16 @@
             --text-sub: #999999;
             --accent-orange: #ff9f43;
             --accent-green: #2ecc71;
+            --accent-yellow: #f1c40f;
+            --accent-red: #e74c3c;
         }
 
-        * { box-sizing: border-box; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        html, body {
+            -webkit-user-select: none;
+            user-select: none;
+        }
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
@@ -39,7 +46,14 @@
         }
 
         h1 { font-size: 1.1rem; margin: 0; color: var(--text-sub); }
-        .update-time { font-size: 0.8rem; color: var(--accent-green); font-weight: bold; }
+        .update-time { font-size: 0.8rem; font-weight: bold; text-align: right; }
+        .update-time .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:5px; vertical-align:middle; }
+        .status-ok { color: var(--accent-green); }
+        .status-ok .dot { background: var(--accent-green); }
+        .status-warn { color: var(--accent-yellow); }
+        .status-warn .dot { background: var(--accent-yellow); }
+        .status-bad { color: var(--accent-red); }
+        .status-bad .dot { background: var(--accent-red); }
 
         .main-layout {
             display: flex;
@@ -82,144 +96,270 @@
         .eta-main { font-size: 1.15rem; font-weight: bold; }
         .eta-sub { font-size: 0.7rem; color: var(--text-sub); }
         .loading { color: var(--text-sub); font-style: italic; font-size: 0.85rem; text-align: center; margin-top: 20px; }
-        .error-msg { color: #e74c3c; font-size: 0.8rem; text-align: center; }
+        .error-msg { color: var(--accent-red); font-size: 0.8rem; text-align: center; }
+
+        /* 資料舊咗（來自快取）嘅視覺標示 */
+        .route-row.stale .eta-main { color: var(--accent-yellow); }
+        .route-row.stale .eta-sub::before { content: "⏱ "; }
+
+        #wake-overlay {
+            position: fixed; inset: 0; background: #000; color: #fff;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.1rem; z-index: 9999; text-align: center; padding: 20px;
+        }
+        #wake-overlay.hidden { display: none; }
     </style>
 </head>
 <body>
 
+    <!-- 開機時輕觸一下，確保 iOS 允許播放防休眠影片並鎖定畫面 -->
+    <div id="wake-overlay">👆 輕觸畫面一下以啟動看板<br><span style="font-size:0.8rem;color:#999;">（然後記得將 iPhone 設定 → 顯示與亮度 → 自動鎖定 設為「永不」）</span></div>
+
+    <!-- 防止 iOS 6s Plus 自動熄屏：靜音循環播放極細影片（iOS 15 無 Wake Lock API，靠呢招） -->
+    <video id="nosleep-video" muted playsinline loop autoplay style="position:fixed; width:1px; height:1px; opacity:0.01; pointer-events:none;">
+        <source src="data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAMPbW9vdgAAAGxtdmhkAAAAAAAAAAAAAAAAAAAD6AAAA+gAAQAAAQAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAcx0cmFrAAAAXHRraGQAAAAHAAAAAAAAAAAAAAABAAAAAAAAA+gAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAEAAAAAoAAAAAJgAAAAAAAJGVkdHMAAAAcZWxzdAAAAAAAAAABAAAD6AAAAAAAAQAAAAABZ21kaWEAAAAgbWRoZAAAAAAAAAAAAAAAAAAAKAAAAAgAVcQAAAAAAC1oZGxyAAAAAAAAAAB2aWRlAAAAAAAAAAAAAAAAVmlkZW9IYW5kbGVyAAAAAQttaW5mAAAAFHZtaGQAAAABAAAAAAAAAAAAAAAkZGluZgAAABxkcmVmAAAAAAAAAAEAAAAMdXJsIAAAAAEAAADLc3RibAAAAJdzdHNkAAAAAAAAAAEAAACHYXZjMQAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAQABAASAAAAEgAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGP//AAAAMmF2Y0MBQsAV/+EAF2dCwBWZBYqUE7BOA0AAO6AAeoAAiPAB1oAOBgABg2AlwBGiVAAAABBwYXNwAAAAAQAAAAEAAAAYc3R0cwAAAAAAAAABAAAAAQAAAAEAAAAcc3RzYwAAAAAAAAABAAAAAQAAAAEAAAABAAAAFHN0c3oAAAAAAAAAAAAAAAEAAAAUc3RjbwAAAAAAAAABAAAAMAAAAGB1ZHRhAAAAWG1ldGEAAAAAAAAAIWhkbHIAAAAAAAAAAG1kaXJhcHBsAAAAAAAAAAAAAAAAK2lsc3QAAAAjqXRvbwAAABtkYXRhAAAAAQAAAABMYXZmNTguMjkuMTAw" type="video/mp4">
+    </video>
+
     <header>
-        <h1>🚍 屋企巴士看板 (6s Plus 橫向專用)</h1>
+        <h1>🚍 屋企巴士看板</h1>
         <div id="update-time" class="update-time">正在初始化...</div>
     </header>
 
     <div class="main-layout">
         <div class="column-left">
             <div class="station-section">
-                <div class="station-title">📍 宏德居 ➡️ 往藍灣半島</div>
+                <div class="station-title">📍 宏德居(柴灣道) ➡️ 往藍灣半島</div>
                 <div id="station-1" class="route-list"><div class="loading">載入中...</div></div>
             </div>
         </div>
 
         <div class="column-right">
             <div class="station-section">
-                <div class="station-title">📍 環翠 ➡️ 往跑馬地</div>
+                <div class="station-title">📍 環翠商場 ➡️ 往跑馬地</div>
                 <div id="station-2" class="route-list"><div class="loading">載入中...</div></div>
             </div>
-            
+
             <div class="station-section">
-                <div class="station-title">📍 環翠 ➡️ 往其他 (82X, 8P)</div>
+                <div class="station-title">📍 環翠商場 ➡️ 往其他 (82X, 8P)</div>
                 <div id="station-3" class="route-list"><div class="loading">載入中...</div></div>
             </div>
         </div>
     </div>
 
     <script>
-        const config = {
-            station1: { stopId: '001307', routes: ['82', '82X', '8X', '8P'], elementId: 'station-1' },
-            station2: { stopId: '001314', routes: ['8X'], elementId: 'station-2' },
-            station3: { stopId: '001314', routes: ['82X', '8P'], elementId: 'station-3' }
-        };
+        // ============================================================
+        // 設定：每個看板分區要顯示邊個站(stopId) + 邊幾條路線
+        // 官方 API 一定要「stopId + 單一路線」先查得到資料，
+        // 唔存在「攞晒成個站所有路線」呢種寫法（呢個係舊版最大 bug）。
+        // ============================================================
+        // 注意：舊版嘅 stopId (001307 / 001314) 其實係錯嘅站——
+        // 001307 係「杏花新城」(完全唔同地方)，001314 呢個站根本唔存在。
+        // 已用政府 API 逐個驗證返正確站柱：
+        //   宏德居, 柴灣道（往小西灣/藍灣半島方向）= 001223
+        //   環翠商場, 柴灣道（往其他方向出小西灣）= 001228
+        const STATIONS = [
+            { elementId: 'station-1', stopId: '001223', routes: ['82', '82X', '8X', '8P'] },
+            { elementId: 'station-2', stopId: '001228', routes: ['8X'] },
+            { elementId: 'station-3', stopId: '001228', routes: ['82X', '8P'] }
+        ];
 
-        async function fetchETA(stopId, targetRoutes) {
+        // 幾個免費 CORS proxy 一齊試，邊個先回應就用邊個（Promise.any）。
+        // 政府 API 本身冇開 CORS，一定要靠 proxy 中轉；單一 proxy（例如 corsproxy.io）
+        // 對非白名單網域可能被擋 / 被限流，所以呢度用多個嚟頂替。
+        const PROXIES = [
+            { name: 'direct',     build: (u) => u },
+            { name: 'allorigins', build: (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}` },
+            { name: 'corsproxy',  build: (u) => `https://corsproxy.io/?url=${encodeURIComponent(u)}` },
+            { name: 'codetabs',   build: (u) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}` }
+        ];
+
+        const PROXY_TIMEOUT_MS = 6000;
+        const REFRESH_INTERVAL_MS = 30000;
+        const TARGET_CONCURRENCY = 3; // 同一時間最多幾多個 stop+route 一齊查
+
+        const routeCache = {}; // key: "stopId|route" -> { items, ts, ok }
+        let isRefreshing = false;
+
+        function cacheKey(stopId, route) { return `${stopId}|${route}`; }
+
+        function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+        async function fetchWithTimeout(url, ms) {
+            const ctrl = new AbortController();
+            const timer = setTimeout(() => ctrl.abort(), ms);
             try {
-                const targetUrl = `https://rt.data.gov.hk/v2/transport/citybus/eta/CTB/${stopId}/1`;
-                const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
-                
-                const response = await fetch(proxyUrl);
-                if (!response.ok) throw new Error('Network error');
-                
-                const data = await response.json();
-                if (!data || !data.data) return [];
-                
-                let result = [];
-                
-                targetRoutes.forEach(rName => {
-                    let matchedEtas = data.data.filter(item => item.route === rName);
-                    
-                    // 環翠商場方向簡易分流
-                    if (stopId === '001314') {
-                        if (rName === '8X') {
-                            matchedEtas = matchedEtas.filter(item => item.dest && item.dest.includes('跑馬地'));
-                        } else {
-                            matchedEtas = matchedEtas.filter(item => item.dest && !item.dest.includes('藍灣') && !item.dest.includes('小西灣'));
-                        }
-                    }
-
-                    // 尋找第一班車
-                    let nextBus = matchedEtas.find(item => item.eta_seq === 1);
-                    
-                    if (nextBus) {
-                        result.push({
-                            route: rName,
-                            dest: nextBus.dest || '未有班次',
-                            etaTime: nextBus.eta ? new Date(nextBus.eta) : null,
-                            rmin: (typeof nextBus.rmin === 'number') ? nextBus.rmin : -1
-                        });
-                    } else {
-                        result.push({ route: rName, dest: '未有班次', etaTime: null, rmin: -1 });
-                    }
-                });
-                return result;
-            } catch (error) {
-                console.error(error);
-                return null;
+                const res = await fetch(url, { signal: ctrl.signal, cache: 'no-store' });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                return await res.json();
+            } finally {
+                clearTimeout(timer);
             }
         }
 
-        function formatTime(date) {
-            if (!date) return '--:--';
-            return date.toTimeString().substring(0, 5);
+        // 對單一 (stopId, route) 組合，將所有 proxy 同時發射，邊個先得就用邊個。
+        async function fetchRouteRaw(stopId, route) {
+            const targetUrl = `https://rt.data.gov.hk/v2/transport/citybus/eta/CTB/${stopId}/${route}`;
+            const attempts = PROXIES.map(p =>
+                fetchWithTimeout(p.build(targetUrl), PROXY_TIMEOUT_MS).then(data => {
+                    if (!data || !Array.isArray(data.data)) throw new Error('bad payload from ' + p.name);
+                    return data.data;
+                })
+            );
+            try {
+                return await Promise.any(attempts);
+            } catch (e) {
+                throw new Error(`所有 proxy 都失敗 (${stopId}/${route})`);
+            }
         }
 
-        async function updateDashboard() {
-            const now = new Date();
-            document.getElementById('update-time').innerText = `更新: ${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'})}`;
+        function pickNextBus(items) {
+            if (!items || items.length === 0) return null;
+            const sorted = [...items].sort((a, b) => (a.eta_seq || 99) - (b.eta_seq || 99));
+            return sorted[0];
+        }
 
-            for (const key in config) {
-                const sect = config[key];
-                const etas = await fetchETA(sect.stopId, sect.routes);
-                const container = document.getElementById(sect.elementId);
-                
-                if (etas === null) {
-                    container.innerHTML = `<div class="error-msg">連線失敗</div>`;
-                    continue;
+        // API 冇 rmin 呢個欄位！要自己用 eta（ISO 時間戳）計返仲有幾多分鐘。
+        function computeDisplay(item, now) {
+            const dest = (item.dest_tc || item.dest_en || item.dest_sc || '').trim();
+            if (!item.eta) {
+                const remark = (item.rmk_tc || item.rmk_en || '').trim();
+                return { etaDisplay: '未有班次', subDisplay: remark || '暫無資料', dest };
+            }
+            const etaDate = new Date(item.eta);
+            const diffMin = Math.round((etaDate - now) / 60000);
+            let etaDisplay = diffMin <= 0 ? '已到站' : `${diffMin} <span>分</span>`;
+            let subDisplay = etaDate.toTimeString().substring(0, 5);
+            if (item.rmk_tc) subDisplay += ` · ${item.rmk_tc}`;
+            return { etaDisplay, subDisplay, dest };
+        }
+
+        function rowHtml(route, dest, etaDisplay, subDisplay, stale) {
+            return `
+                <div class="route-row ${stale ? 'stale' : ''}">
+                    <div class="route-info">
+                        <span class="route-name">${route}</span>
+                        <span class="route-dest">往${dest || '未知'}</span>
+                    </div>
+                    <div class="eta-info">
+                        <div class="eta-main">${etaDisplay}</div>
+                        <div class="eta-sub">${subDisplay}</div>
+                    </div>
+                </div>`;
+        }
+
+        function formatClock(ts) {
+            if (!ts) return '--:--:--';
+            return new Date(ts).toTimeString().substring(0, 8);
+        }
+
+        function renderStation(station, now) {
+            const container = document.getElementById(station.elementId);
+            let html = '';
+            station.routes.forEach(route => {
+                const key = cacheKey(station.stopId, route);
+                const cached = routeCache[key];
+                const stale = !cached || cached.ok === false;
+
+                if (!cached || !cached.items || cached.items.length === 0) {
+                    if (!cached) {
+                        html += `<div class="loading">載入中...</div>`;
+                        return;
+                    }
+                    html += rowHtml(route, '', '連線失敗', `顯示中斷 · 上次成功 ${formatClock(cached.ts)}`, true);
+                    return;
                 }
 
-                let htmlContent = '';
-                etas.forEach(bus => {
-                    let etaDisplay = '';
-                    let subDisplay = '';
+                const item = pickNextBus(cached.items);
+                const disp = computeDisplay(item, now);
+                html += rowHtml(route, disp.dest, disp.etaDisplay, disp.subDisplay, stale);
+            });
+            container.innerHTML = html;
+        }
 
-                    if (bus.rmin === -1) {
-                        etaDisplay = '暫無車';
-                        subDisplay = '未有班次';
-                    } else if (bus.rmin <= 0) {
-                        etaDisplay = '已到站';
-                        subDisplay = `預計 ${formatTime(bus.etaTime)}`;
-                    } else {
-                        etaDisplay = `${bus.rmin} <span>分</span>`;
-                        subDisplay = `${formatTime(bus.etaTime)}`;
-                    }
+        function getAllTargets() {
+            const map = new Map();
+            STATIONS.forEach(st => st.routes.forEach(r => map.set(cacheKey(st.stopId, r), { stopId: st.stopId, route: r })));
+            return Array.from(map.values());
+        }
 
-                    htmlContent += `
-                        <div class="route-row">
-                            <div class="route-info">
-                                <span class="route-name">${bus.route}</span>
-                                <span class="route-dest">往${bus.dest}</span>
-                            </div>
-                            <div class="eta-info">
-                                <div class="eta-main">${etaDisplay}</div>
-                                <div class="eta-sub">${subDisplay}</div>
-                            </div>
-                        </div>
-                    `;
-                });
-                container.innerHTML = htmlContent;
+        function setHeaderStatus(successCount, failCount, total) {
+            const el = document.getElementById('update-time');
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            if (failCount === 0) {
+                el.className = 'update-time status-ok';
+                el.innerHTML = `<span class="dot"></span>已連線 ${timeStr}`;
+            } else if (successCount > 0) {
+                el.className = 'update-time status-warn';
+                el.innerHTML = `<span class="dot"></span>部分逾時 (${failCount}/${total}) ${timeStr}`;
+            } else {
+                el.className = 'update-time status-bad';
+                el.innerHTML = `<span class="dot"></span>離線中，顯示快取 ${timeStr}`;
             }
         }
 
-        updateDashboard();
-        setInterval(updateDashboard, 30000);
+        async function refreshAll() {
+            if (isRefreshing) return; // 上一輪未做完就唔好重疊
+            isRefreshing = true;
+            try {
+                const targets = getAllTargets();
+                let idx = 0;
+                let successCount = 0, failCount = 0;
+
+                async function worker() {
+                    while (idx < targets.length) {
+                        const t = targets[idx++];
+                        const key = cacheKey(t.stopId, t.route);
+                        try {
+                            const items = await fetchRouteRaw(t.stopId, t.route);
+                            routeCache[key] = { items, ts: Date.now(), ok: true };
+                            successCount++;
+                        } catch (e) {
+                            const prev = routeCache[key];
+                            routeCache[key] = { items: prev ? prev.items : [], ts: prev ? prev.ts : null, ok: false };
+                            failCount++;
+                        }
+                    }
+                }
+
+                const workers = Array.from({ length: Math.min(TARGET_CONCURRENCY, targets.length) }, () => worker());
+                await Promise.all(workers);
+
+                const now = new Date();
+                STATIONS.forEach(st => renderStation(st, now));
+                setHeaderStatus(successCount, failCount, targets.length);
+            } finally {
+                isRefreshing = false;
+            }
+        }
+
+        // ---------- 防止 iPhone 6s Plus (iOS 15，冇 Screen Wake Lock API) 自動熄屏 ----------
+        function initNoSleep() {
+            const video = document.getElementById('nosleep-video');
+            const overlay = document.getElementById('wake-overlay');
+
+            function tryPlay() {
+                video.play().catch(() => { /* 需要手動輕觸一下先播到 */ });
+            }
+
+            overlay.addEventListener('click', () => {
+                overlay.classList.add('hidden');
+                tryPlay();
+            }, { once: true });
+
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden) tryPlay();
+            });
+
+            // 每分鐘保險檢查一次，防止影片中途被系統暫停
+            setInterval(() => { if (video.paused) tryPlay(); }, 60000);
+
+            tryPlay();
+        }
+
+        initNoSleep();
+        refreshAll();
+        setInterval(refreshAll, REFRESH_INTERVAL_MS);
     </script>
 </body>
 </html>
