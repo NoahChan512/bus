@@ -27,7 +27,7 @@
             margin: 0;
             padding: 10px;
             height: 100vh;
-            overflow: hidden; /* 確保絕不出現卷軸 */
+            overflow: hidden;
             display: flex;
             flex-direction: column;
         }
@@ -52,7 +52,6 @@
             font-weight: bold;
         }
 
-        /* 橫向分欄核心：左邊宏德居，右邊環翠 */
         .main-layout {
             display: flex;
             flex: 1;
@@ -62,7 +61,7 @@
         }
 
         .column-left {
-            flex: 1.2; /* 讓宏德居空間稍大，因為有4條線 */
+            flex: 1.2;
             display: flex;
             flex-direction: column;
         }
@@ -84,7 +83,6 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.5);
         }
 
-        /* 右邊兩組分開 */
         .column-right .station-section {
             height: calc(50% - 5px); 
         }
@@ -103,7 +101,7 @@
             flex: 1;
             display: flex;
             flex-direction: column;
-            justify-content: space-around; /* 平均分配行高，塞滿格子 */
+            justify-content: space-around;
         }
 
         .route-row {
@@ -123,7 +121,7 @@
             font-size: 1.3rem;
             font-weight: 900;
             color: var(--accent-orange);
-            width: 45px; /* 固定寬度對齊 */
+            width: 45px;
         }
 
         .route-dest {
@@ -219,8 +217,16 @@
 
         async function fetchETA(stopId, targetRoutes) {
             try {
-                const response = await fetch(`https://rt.data.gov.hk/v2/transport/citybus/eta/CTB/${stopId}/1`);
-                const data = await response.json();
+                // 使用了開源的 CORS Proxy 代理去包裝原本的城巴網址，完美解決安全限制
+                const targetUrl = `https://rt.data.gov.hk/v2/transport/citybus/eta/CTB/${stopId}/1`;
+                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+                
+                const response = await fetch(proxyUrl);
+                const proxyData = await response.json();
+                
+                // allorigins 會將結果包在 .contents 字串內，我們需要將它轉回 JSON
+                const data = JSON.parse(proxyData.contents);
+                
                 if (!data || !data.data) return [];
                 
                 let result = [];
@@ -241,6 +247,7 @@
                 });
                 return result;
             } catch (error) {
+                console.error("Error fetching bus data:", error);
                 return null;
             }
         }
@@ -298,7 +305,7 @@
         }
 
         updateDashboard();
-        setInterval(updateDashboard, 30000);
+        setInterval(updateDashboard, 30000); // 每 30 秒自動刷新
     </script>
 </body>
 </html>
