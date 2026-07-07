@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>🏠 6s Plus 橫向巴士看板 (終極穩定版)</title>
+    <title>🏠 6s Plus 橫向巴士看板 (極速直出版)</title>
     <style>
         :root {
             --bg-color: #0c0c0c;
@@ -114,31 +114,21 @@
     </div>
 
     <script>
-        // 改回城巴官方 Stop ID，並配對正確的目的地
+        // 配置簡化：只對應路線名稱，直接由 API 回傳的目的地做顯示，不再硬性過濾字眼
         const config = {
             station1: {
-                stopId: '001307', // 宏德居
-                routes: [
-                    { route: '82', dest: '藍灣半島' },
-                    { route: '82X', dest: '藍灣半島' },
-                    { route: '8X', dest: '藍灣半島' },
-                    { route: '8P', dest: '藍灣半島' }
-                ],
+                stopId: '001307',
+                routes: ['82', '82X', '8X', '8P'],
                 elementId: 'station-1'
             },
             station2: {
-                stopId: '001314', // 環翠商場
-                routes: [
-                    { route: '8X', dest: '跑馬地 (下)' }
-                ],
+                stopId: '001314',
+                routes: ['8X'], // 往跑馬地通常和往小西灣方向不同，若城巴在同一個 StopID 回傳雙向，我們稍後再作特別處理
                 elementId: 'station-2'
             },
             station3: {
-                stopId: '001314', // 環翠商場
-                routes: [
-                    { route: '82X', dest: '鰂魚涌' },
-                    { route: '8P', dest: '灣仔 (北)' }
-                ],
+                stopId: '001314',
+                routes: ['82X', '8P'],
                 elementId: 'station-3'
             }
         };
@@ -146,37 +136,56 @@
         async function fetchETA(stopId, targetRoutes) {
             try {
                 const targetUrl = `https://rt.data.gov.hk/v2/transport/citybus/eta/CTB/${stopId}/1`;
-                // 使用最穩定、速度極快且專門處理 CORS 的 corsproxy.io
                 const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
                 
                 const response = await fetch(proxyUrl);
-                if (!response.ok) throw new Error('Network response was not ok');
+                if (!response.ok) throw new Error('Network error');
                 
                 const data = await response.json();
                 if (!data || !data.data) return [];
                 
                 let result = [];
-                targetRoutes.forEach(target => {
-                    let matchedEtas = data.data.filter(item => item.route === target.route);
-                    // 篩選第一班最快到的車
+                
+                // 直接依據你要的路線，抓取最快的一班車
+                targetRoutes.forEach(rName => {
+                    let matchedEtas = data.data.filter(item => item.route === rName);
+                    
+                    // 為了防止環翠商場 (001314) 撈到相反方向的車，做一個簡單的方向分流
+                    if (stopId === '001314') {
+                        if (rName === '8X' && elementIdForRoute(rName, stopId) === 'station-2') {
+                            // 往跑馬地
+                            matchedEtas = matchedEtas.filter(item => item.dest.includes('跑馬地'));
+                        } else if ((rName === '82X' || rName === '8P') && elementIdForRoute(rName, stopId) === 'station-3') {
+                            // 往鰂魚涌 / 灣仔
+                            matchedEtas = matchedEtas.filter(item => !item.dest.includes('藍灣') && !item.dest.includes('小西灣'));
+                        }
+                    }
+
                     let nextBus = matchedEtas.find(item => item.eta_seq === 1);
                     
-                    if (nextBus && nextBus.eta) {
+                    if (nextBus) {
                         result.push({
-                            route: target.route,
-                            dest: target.dest.replace(' (藍灣半島)', '').replace(' (下)', '').replace(' (北)', ''),
-                            etaTime: new Date(nextBus.eta),
+                            route: rName,
+                            dest: nextBus.dest.replace(' (藍灣半島)', '').replace(' (下)', '').replace(' (北)', ''),
+                            etaTime: nextBus.eta ? new Date(nextBus.eta) : null,
                             rmin: nextBus.rmin
                         });
                     } else {
-                        result.push({ route: target.route, dest: target.dest.replace(' (藍灣半島)', '').replace(' (下)', '').replace(' (北)', ''), etaTime: null, rmin: -1 });
+                        result.push({ route: rName, dest: '未有班次', etaTime: null, rmin: -1 });
                     }
                 });
                 return result;
             } catch (error) {
-                console.error("Fetch error:", error);
+                console.error(error);
                 return null;
             }
+        }
+
+        // 輔助函式：判斷路線屬於哪一個分組
+        function elementIdForRoute(rName, stopId) {
+            if (stopId === '001307') return 'station-1';
+            if (stopId === '001314' && rName === '8X') return 'station-2';
+            return 'station-3';
         }
 
         function formatTime(date) {
@@ -194,12 +203,7 @@
                 const container = document.getElementById(sect.elementId);
                 
                 if (etas === null) {
-                    container.innerHTML = `<div class="error-msg">連線失敗，稍後重試</div>`;
-                    continue;
-                }
-                
-                if (etas.length === 0) {
-                    container.innerHTML = `<div class="loading">無數據</div>`;
+                    container.innerHTML = `<div class="error-msg">連線失敗</div>`;
                     continue;
                 }
 
@@ -237,7 +241,7 @@
         }
 
         updateDashboard();
-        setInterval(updateDashboard, 30000); // 30秒自動刷新
+        setInterval(updateDashboard, 30000);
     </script>
 </body>
 </html>
