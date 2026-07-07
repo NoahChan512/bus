@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>🏠 6s Plus 橫向巴士看板 (極速直出版)</title>
+    <title>🏠 6s Plus 橫向巴士看板 (終極防錯版)</title>
     <style>
         :root {
             --bg-color: #0c0c0c;
@@ -114,23 +114,10 @@
     </div>
 
     <script>
-        // 配置簡化：只對應路線名稱，直接由 API 回傳的目的地做顯示，不再硬性過濾字眼
         const config = {
-            station1: {
-                stopId: '001307',
-                routes: ['82', '82X', '8X', '8P'],
-                elementId: 'station-1'
-            },
-            station2: {
-                stopId: '001314',
-                routes: ['8X'], // 往跑馬地通常和往小西灣方向不同，若城巴在同一個 StopID 回傳雙向，我們稍後再作特別處理
-                elementId: 'station-2'
-            },
-            station3: {
-                stopId: '001314',
-                routes: ['82X', '8P'],
-                elementId: 'station-3'
-            }
+            station1: { stopId: '001307', routes: ['82', '82X', '8X', '8P'], elementId: 'station-1' },
+            station2: { stopId: '001314', routes: ['8X'], elementId: 'station-2' },
+            station3: { stopId: '001314', routes: ['82X', '8P'], elementId: 'station-3' }
         };
 
         async function fetchETA(stopId, targetRoutes) {
@@ -146,29 +133,27 @@
                 
                 let result = [];
                 
-                // 直接依據你要的路線，抓取最快的一班車
                 targetRoutes.forEach(rName => {
                     let matchedEtas = data.data.filter(item => item.route === rName);
                     
-                    // 為了防止環翠商場 (001314) 撈到相反方向的車，做一個簡單的方向分流
+                    // 環翠商場方向簡易分流
                     if (stopId === '001314') {
-                        if (rName === '8X' && elementIdForRoute(rName, stopId) === 'station-2') {
-                            // 往跑馬地
-                            matchedEtas = matchedEtas.filter(item => item.dest.includes('跑馬地'));
-                        } else if ((rName === '82X' || rName === '8P') && elementIdForRoute(rName, stopId) === 'station-3') {
-                            // 往鰂魚涌 / 灣仔
-                            matchedEtas = matchedEtas.filter(item => !item.dest.includes('藍灣') && !item.dest.includes('小西灣'));
+                        if (rName === '8X') {
+                            matchedEtas = matchedEtas.filter(item => item.dest && item.dest.includes('跑馬地'));
+                        } else {
+                            matchedEtas = matchedEtas.filter(item => item.dest && !item.dest.includes('藍灣') && !item.dest.includes('小西灣'));
                         }
                     }
 
+                    // 尋找第一班車
                     let nextBus = matchedEtas.find(item => item.eta_seq === 1);
                     
                     if (nextBus) {
                         result.push({
                             route: rName,
-                            dest: nextBus.dest.replace(' (藍灣半島)', '').replace(' (下)', '').replace(' (北)', ''),
+                            dest: nextBus.dest || '未有班次',
                             etaTime: nextBus.eta ? new Date(nextBus.eta) : null,
-                            rmin: nextBus.rmin
+                            rmin: (typeof nextBus.rmin === 'number') ? nextBus.rmin : -1
                         });
                     } else {
                         result.push({ route: rName, dest: '未有班次', etaTime: null, rmin: -1 });
@@ -179,13 +164,6 @@
                 console.error(error);
                 return null;
             }
-        }
-
-        // 輔助函式：判斷路線屬於哪一個分組
-        function elementIdForRoute(rName, stopId) {
-            if (stopId === '001307') return 'station-1';
-            if (stopId === '001314' && rName === '8X') return 'station-2';
-            return 'station-3';
         }
 
         function formatTime(date) {
